@@ -4,6 +4,7 @@ require(D3Scatter)
 require(GSVA)
 require(Rtsne)
 require(RColorBrewer)
+require(limma)
 
 ui <- navbarPage(title = "tSNEfier",
     tabPanel(title = "File loading",
@@ -50,7 +51,10 @@ ui <- navbarPage(title = "tSNEfier",
                 )
             ),
             column(6,
-                   verbatimTextOutput("currentOutput")
+                   actionButton("diffGenes", "Differential Genes"),
+                   actionButton("diffPathways", "Differential Pathways"),
+                   dataTableOutput('diffTable')
+
             )
         )
     )
