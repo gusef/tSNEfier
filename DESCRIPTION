@@ -3,7 +3,7 @@ Title: An interactive tool to explore tSNE plots
 Version: 0.0.0.9000
 Authors@R: person("Daniel", "Gusenleitner", email = "daniel.gusenleitner@dfci.harvard.edu", role = c("aut", "cre"))
 Description: Simple tool that reads a gene expression dataset, performs single sample gene set variance analysis and then displays the data in a tSNE plot. Groups of samples in the tSNE can be selected and used for differential expression analysis.
-Depends: R (>= 3.4.0), GSVA, limma, RColorBrewer, Rtsne, shiny,  shinyjs
+Depends: R (>= 3.4.0), GSVA, limma, RColorBrewer, Rtsne, shiny,  shinyjs, SummarizedExperiment
 License: MIT
 Encoding: UTF-8
 LazyData: true

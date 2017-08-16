@@ -5,6 +5,7 @@ require(GSVA)
 require(Rtsne)
 require(RColorBrewer)
 require(limma)
+require(SummarizedExperiment)
 
 ui <- navbarPage(title = "tSNEfier",
     tabPanel(title = "File loading",
@@ -17,8 +18,7 @@ ui <- navbarPage(title = "tSNEfier",
                 fileInput("gmt_file", 
                           "Load gene set file (.gmt)",
                           accept = c(".gmt")),
-                actionButton("runGSVA", "Run GSVA"),
-                actionButton("runtSNE", "Run tSNE")
+                actionButton("runGSVA", "Run GSVA")
             ),
             column(6,
                 fileInput("state_file", 
@@ -48,7 +48,11 @@ ui <- navbarPage(title = "tSNEfier",
                                 label = h5("Select covariate"), 
                                 choices = NULL)
                     )
-                )
+                ),
+                actionButton("runtSNE", "Run tSNE"),
+                selectizeInput("gene_filter", 
+                               label = h5("Select gene space for the filter"), 
+                               choices = NULL)
             ),
             column(6,
                    actionButton("diffGenes", "Differential Genes"),
@@ -59,10 +63,3 @@ ui <- navbarPage(title = "tSNEfier",
         )
     )
 )
-
-                 
-
-
-
-                                    
-                           

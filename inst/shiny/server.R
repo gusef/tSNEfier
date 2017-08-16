@@ -3,9 +3,15 @@ gc()
 
 
 update_inputs <- function(session, input, values){
+
     #update gene select
-    genes <- lapply(featureNames(values$eSet),function(x)x)
-    names(genes) <- featureNames(values$eSet)
+    selection <- rownames(values$eSet)
+    if (input$gene_filter != 'All'){
+
+        selection <- selection[selection %in% values$gene_sets[[input$gene_filter]]] 
+    }
+    genes <- lapply(selection,function(x)x)
+    names(genes) <- selection
     updateSelectizeInput(session,
                          'gene_color', 
                          choices = genes)
@@ -16,8 +22,8 @@ update_inputs <- function(session, input, values){
                          choices = values$gene_set_select[-1])
     
     #update covariate select
-    cova <- lapply(colnames(pData(values$eSet)),function(x)x)
-    names(cova) <- colnames(pData(values$eSet))
+    cova <- lapply(names(colData(values$eSet)),function(x)x)
+    names(cova) <- names(colData(values$eSet))
     updateSelectizeInput(session,
                          'covariate_color',
                          choices = cova)
@@ -37,12 +43,28 @@ server <- function(input, output, session) {
                              tSNE_color = "black",
                              tSNE_legend = NULL,
                              tSNE_title = "",
+                             tSNE_space = "All",
                              verbose = NULL)
      
     #loading ExpressionSet
     observeEvent(input$eSet_file,{ 
+        if (is.null(input$eSet_file)){
+            return (NULL)
+        }
+        #read in the gene expression object and figure out whether it is a eSet or Summarized experiment
+        dat <- readRDS(input$eSet_file$datapath)
+                
+        if (class(dat) == "ExpressionSet"){
+            dat <- makeSummarizedExperimentFromExpressionSet(dat)
+        }else if(class(dat) != "SummarizedExperiment"){
+            showModal(modalDialog(
+                title = "Error",
+                "Gene expression set set to be an 'ExpressionSet' or 'SummarizedExperiment' class"
+            ))
+            return(NULL)
+        } 
         values$gsva <- NULL
-        values$eSet <- readRDS(input$eSet_file$datapath)
+        values$eSet <- dat
     })
     
     #loading gmt file
@@ -60,14 +82,13 @@ server <- function(input, output, session) {
         sets <- sapply(sets,function(x)x[-(1:2)])
         
         #make sure they are actually represented
-        sets <- lapply(sets,function(x,nams)x[x %in% nams],featureNames(values$eSet))
+        sets <- lapply(sets,function(x,nams)x[x %in% nams],rownames(values$eSet))
         filter <- sapply(sets,length) > 0
         if (sum(filter) == 0){
             showModal(modalDialog(
                 title = "Error",
                 "None of the genes in the gene sets were represented in the expression set."
             ))
-            
         } else{
             values$gene_set_desc <- desc[filter]
             values$gene_sets <- sets[filter]
@@ -75,6 +96,12 @@ server <- function(input, output, session) {
             #make a list so selectize is easier
             values$gene_set_select <- c('All', lapply(names(sets),function(x)x))
             names(values$gene_set_select) <- c('All', names(sets))
+            
+            #update gene space filter
+            updateSelectizeInput(session,
+                                 'gene_filter', 
+                                 choices = values$gene_set_select,
+                                 selected = values$gene_set_select[2])
         }
     })
     
@@ -88,7 +115,8 @@ server <- function(input, output, session) {
         withProgress(message = 'Running GSVA ... ',
                      detail = 'This may take a while...',
                      value = 0.5, {
-            values$gsva_scores <- gsva(values$eSet, values$gene_sets)$es.obs
+                         
+            values$gsva_scores <- gsva(assay(values$eSet), values$gene_sets)$es.obs
         })
     })
     
@@ -105,7 +133,8 @@ server <- function(input, output, session) {
             title = "Running t-SNE",
             selectInput("tSNE_pathway", 
                         label = h3("Select the gene set space"), 
-                        choices = values$gene_set_select),
+                        choices = values$gene_set_select,
+                        selected = values$gene_set_select[2]),
             numericInput(inputId = 'tSNE_iter',
                          value = 1000,
                          max = 5000,
@@ -130,7 +159,10 @@ server <- function(input, output, session) {
     
     #if run tsne button has been pushed
     observeEvent(input$tsne_ok, {
-        mat <- t(exprs(values$eSet))
+        mat <- t(assay(values$eSet))
+        
+        #indicate what space was used to derive the tSNE
+        values$tSNE_space <- input$tSNE_pathway
         
         if (input$tSNE_pathway != 'All'){
             mat <- mat[,values$gene_sets[[input$tSNE_pathway]]]     
@@ -139,13 +171,12 @@ server <- function(input, output, session) {
         withProgress(message = 'Running t-SNE ... ',
                      detail = 'This may take a while...',
                      value = 0.5, {
-                         #capture output
-                         values$verbose <- capture.output(
-                             values$tSNE <- Rtsne(mat,
-                                                  max_iter = input$tSNE_iter,
-                                                  perplexity = input$tSNE_perplexity,
-                                                  theta = input$tSNE_theta,
-                                                  verbose = TRUE))
+                        set.seed(123) 
+                        values$tSNE <- Rtsne(mat,
+                                             max_iter = input$tSNE_iter,
+                                             perplexity = input$tSNE_perplexity,
+                                             theta = input$tSNE_theta,
+                                             verbose = TRUE)
                      })
         removeModal()
         update_inputs(session, input, values)
@@ -158,6 +189,20 @@ server <- function(input, output, session) {
             values[[idx]] <- vals[[idx]]
         }     
         if (!is.null(values$tSNE)){
+            update_inputs(session, input, values)
+        }
+        
+        #update gene space filter
+        if (!is.null(values$gene_set_select)){
+            updateSelectizeInput(session,
+                                 'gene_filter', 
+                                 choices = values$gene_set_select,
+                                 selected = values$gene_set_select[2])
+        }
+    })
+    
+    observeEvent(input$gene_filter,{
+        if (!is.null(values$eSet)){
             update_inputs(session, input, values)
         }
     })
@@ -182,7 +227,7 @@ server <- function(input, output, session) {
             return(NULL)
         }
         values$tSNE_legend <- NULL
-        values$tSNE_color <- exprs(values$eSet)[input$gene_color,]
+        values$tSNE_color <- assay(values$eSet)[input$gene_color,]
         values$tSNE_title <- input$gene_color
     })
     
@@ -192,7 +237,7 @@ server <- function(input, output, session) {
             return (NULL)
         }
         values$tSNE_legend <- NULL
-        values$tSNE_color <- exprs(values$gsva_scores)[input$pathway_color,]
+        values$tSNE_color <- values$gsva_scores[input$pathway_color,]
         values$tSNE_title <- input$pathway_color
     })
     
@@ -247,15 +292,14 @@ server <- function(input, output, session) {
             D3Scatter(dat,
                       col=values$tSNE_color,
                       dotsize = 5,
-                      xlab='1st tSNE axis',
-                      ylab='2nd tSNE axis',
+                      xlab=paste(values$tSNE_space,'- 1st axis'),
+                      ylab=paste(values$tSNE_space,'- 2nd axis'),
                       title=values$tSNE_title,
                       tooltip = c('names'),
                       legend = values$tSNE_legend,
                       callback_handler='ScatterSelection')
         }
     })
-
     
     observeEvent(input$diffGenes, {
         if (is.null(input$ScatterSelection)){
@@ -265,7 +309,8 @@ server <- function(input, output, session) {
             title = "Differential Expression",
             selectInput("diff_pathway", 
                         label = h3("Select the gene set space"), 
-                        choices = values$gene_set_select),
+                        choices = values$gene_set_select,
+                        selected = values$gene_set_select[2]),
             easyClose = TRUE,
             footer = tagList(
                 modalButton("Cancel"),
@@ -274,7 +319,7 @@ server <- function(input, output, session) {
     })    
 
     observeEvent(input$diff_ok, {    
-        dat <- exprs(values$eSet)
+        dat <- assay(values$eSet)
         
         if (input$diff_pathway != 'All'){
             dat <- dat[values$gene_sets[[input$diff_pathway]],]     
@@ -311,28 +356,40 @@ server <- function(input, output, session) {
             return(NULL)
         }    
         
-        dat <- exprs(values$gsva_scores)
+        dat <- values$gsva_scores
         
         #generate label according to selection
         label <- (1:ncol(values$eSet)) %in% as.numeric(input$ScatterSelection)
         label <- c('notSelected','Selected')[label+1]
         
+        #extract p-value
         res <- sapply(1:nrow(dat),
                       function(x, dat, lab)
                           wilcox.test(dat[x, lab == unique(lab)[1]],
                                       dat[x, lab == unique(lab)[2]])$p.value,
                       dat,
                       label)
+        
+        #W stat
+        stat <- sapply(1:nrow(dat),
+                        function(x, dat, lab)
+                            wilcox.test(dat[x, lab == unique(lab)[1]],
+                                         dat[x, lab == unique(lab)[2]])$statistic,
+                        dat,
+                        label)
+        
+        #results
         wilcox_res <- data.frame(
-            Pathway = rownames(dat),
+            Pathway = gsub('_',' ',rownames(dat)),
+            W = stat,
             p.value = res,
             FDR = p.adjust(res,
                            method = 'BH',
                            n = length(res))
         )
         wilcox_res <- wilcox_res[order(wilcox_res$p.value,decreasing = F), ]
-        wilcox_res$p.value <- format(wilcox_res$p.value, digits = 2 )
-        wilcox_res$FDR <- format(wilcox_res$FDR, digits = 2 )
+        wilcox_res$p.value <- format(wilcox_res$p.value, digits = 4 )
+        wilcox_res$FDR <- format(wilcox_res$FDR, digits = 4 )
         
         values$diffTable <- wilcox_res
     })
