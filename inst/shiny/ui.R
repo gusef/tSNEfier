@@ -1,6 +1,6 @@
 require(shiny)
 require(shinyjs)
-require(D3Scatter)
+require(d3Toolbox)
 require(GSVA)
 require(Rtsne)
 require(RColorBrewer)
@@ -31,7 +31,7 @@ ui <- navbarPage(title = "tSNEfier",
     tabPanel(title = "Display panel",
         fluidRow(
             column(6,
-                D3ScatterOutput("scatter", width = "100%", height = "600"),
+                d3ScatterOutput("scatter", width = "100%", height = "600"),
                 fluidRow(
                     column(4,
                         selectizeInput("gene_color", 

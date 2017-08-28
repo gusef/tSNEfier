@@ -283,13 +283,13 @@ server <- function(input, output, session) {
         }
     })
     
-    output$scatter <- renderD3Scatter({
+    output$scatter <- renderd3Scatter({
         if (!is.null(values$tSNE)){
 
             dat <- data.frame(x=values$tSNE$Y[,1],
                               y=values$tSNE$Y[,2],
                               names=colnames(values$eSet))
-            D3Scatter(dat,
+            d3Scatter(dat,
                       col=values$tSNE_color,
                       dotsize = 5,
                       xlab=paste(values$tSNE_space,'- 1st axis'),
@@ -297,7 +297,7 @@ server <- function(input, output, session) {
                       title=values$tSNE_title,
                       tooltip = c('names'),
                       legend = values$tSNE_legend,
-                      callback_handler='ScatterSelection')
+                      callback='ScatterSelection')
         }
     })
     
