@@ -116,7 +116,7 @@ server <- function(input, output, session) {
                      detail = 'This may take a while...',
                      value = 0.5, {
                          
-            values$gsva_scores <- gsva(assay(values$eSet), values$gene_sets)$es.obs
+            values$gsva_scores <- gsva(assays(values$eSet)[[length(assays(values$eSet))]], values$gene_sets)
         })
     })
     
@@ -159,7 +159,7 @@ server <- function(input, output, session) {
     
     #if run tsne button has been pushed
     observeEvent(input$tsne_ok, {
-        mat <- t(assay(values$eSet))
+        mat <- t(assays(values$eSet)[[length(assays(values$eSet))]])
         
         #indicate what space was used to derive the tSNE
         values$tSNE_space <- input$tSNE_pathway
@@ -227,7 +227,7 @@ server <- function(input, output, session) {
             return(NULL)
         }
         values$tSNE_legend <- NULL
-        values$tSNE_color <- assay(values$eSet)[input$gene_color,]
+        values$tSNE_color <- assays(values$eSet)[[length(assays(values$eSet))]][input$gene_color,]
         values$tSNE_title <- input$gene_color
     })
     
@@ -319,7 +319,7 @@ server <- function(input, output, session) {
     })    
 
     observeEvent(input$diff_ok, {    
-        dat <- assay(values$eSet)
+        dat <- assays(values$eSet)[[length(assays(values$eSet))]]
         
         if (input$diff_pathway != 'All'){
             dat <- dat[values$gene_sets[[input$diff_pathway]],]     
